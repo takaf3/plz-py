@@ -11,6 +11,7 @@ from pygments import highlight
 from pygments.lexers import BashLexer
 from pygments.formatters import TerminalFormatter
 import logging
+import argparse
 
 init(autoreset=True)  # Initialize colorama
 
@@ -27,23 +28,21 @@ def build_prompt(user_prompt):
     return f"{user_prompt}{os_hint}:\n```bash\n#!/bin/bash\n"
 
 def main():
-    if '-h' in sys.argv or '--help' in sys.argv:
-        print(f"{Fore.GREEN}Usage: python main.py [options] <prompt>")
-        print(f"{Fore.GREEN}Options:")
-        print(f"  -h, --help      Show this help message and exit")
-        print(f"  -vvv            Enable verbose logging")
-        print(f"{Fore.GREEN}Example:")
-        print(f"  python main.py 'list files in current directory'")
-        sys.exit(0)
+    parser = argparse.ArgumentParser(description="Generate and execute shell commands based on natural language prompts.")
+    parser.add_argument('-a', '--api-base', default="http://localhost:11434", help="API base URL (default: http://localhost:11434)")
+    parser.add_argument('-m', '--model', default="codegemma:instruct", help="Model to use (default: codegemma:instruct)")
+    parser.add_argument('-v', '--verbose', action='store_true', help="Enable verbose logging")
+    parser.add_argument('prompt', nargs='+', help="The prompt for generating the command")
 
-    if len(sys.argv) < 2:
-        print(f"{Fore.RED}Error: Please provide a prompt.")
-        sys.exit(1)
+    args = parser.parse_args()
 
-    user_prompt = " ".join(sys.argv[1:])
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    user_prompt = " ".join(args.prompt)
     config = {
-        "api_base": "http://localhost:11434",  # Assuming default Ollama address
-        "model": "codegemma:instruct",  # Assuming default model
+        "api_base": args.api_base,
+        "model": args.model,
     }
 
     client = requests.Session()
