@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import subprocess
 import json
@@ -35,7 +36,6 @@ def main():
         print(f"  python main.py 'list files in current directory'")
         sys.exit(0)
 
-    auto_run = False  # Removed the '-y' option
     if len(sys.argv) < 2:
         print(f"{Fore.RED}Error: Please provide a prompt.")
         sys.exit(1)
@@ -47,10 +47,9 @@ def main():
     }
 
     client = requests.Session()
-    should_run = auto_run  # Set to True if auto_run is enabled
     code = ""
 
-    while not should_run:
+    while True:
         with Halo(text='Generating your command...', spinner='dots') as spinner:
             api_addr = f"{config['api_base']}/api/generate"
             response = client.post(api_addr, json={
@@ -102,33 +101,29 @@ def main():
             print(f"{Fore.GREEN}✔ Got some code!")
             print(highlight(code, BashLexer(), TerminalFormatter()))
 
-            if not auto_run:  # Only prompt if not in auto-run mode
-                completer = WordCompleter(['y', 'n', 'r'])
-                user_input = prompt(">> Run the generated program? [Y/n/r] ", completer=completer, default='y').lower()
+            completer = WordCompleter(['n', 'r'])  # Remove 'y' from completer options
+            user_input = prompt(">> Run the generated program? [Y/n/r] ", completer=completer).lower()  # Default is still 'y'
 
-                if user_input in ('y', ''):
-                    should_run = True
-                elif user_input == 'n':
-                    sys.exit(0)
-            else:
-                should_run = True  # Automatically run the command
+            if user_input == '' or user_input == 'y':  # Enter means 'y'
+                break
+            elif user_input == 'n':
+                sys.exit(0)
 
         except Exception as e:
             logging.exception("An unexpected error occurred.")
             print("An unexpected error occurred.")
             sys.exit(1)
 
-    if should_run:
-        print(f"{Fore.GREEN}✔ Executed command: {code}")  # Output the generated command
-        with Halo(text='Executing...', spinner='dots') as spinner:
-            try:
-                result = subprocess.run(['bash', '-c', code], capture_output=True, text=True, check=True)
-                spinner.succeed("Command ran successfully")
-                print(result.stdout)  # Output the result of the command
-            except subprocess.CalledProcessError as e:
-                spinner.fail("The program threw an error.")
-                print(e.stderr)
-                sys.exit(1)
+    print(f"{Fore.GREEN}✔ Executed command: {code}")  # Output the generated command
+    with Halo(text='Executing...', spinner='dots') as spinner:
+        try:
+            result = subprocess.run(['bash', '-c', code], capture_output=True, text=True, check=True)
+            spinner.succeed("Command ran successfully")
+            print(result.stdout)  # Output the result of the command
+        except subprocess.CalledProcessError as e:
+            spinner.fail("The program threw an error.")
+            print(e.stderr)
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
