@@ -1,0 +1,7 @@
+requests
+colorama
+prompt_toolkit
+halo
+pygments
+
+
