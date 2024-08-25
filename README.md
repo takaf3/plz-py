@@ -19,7 +19,7 @@ PLZ is a Python-based command-line tool that generates and executes shell comman
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/plz.git
+   git clone https://github.com/takaf3/plz-py.git
    cd plz
    ```
 
