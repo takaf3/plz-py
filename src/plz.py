@@ -29,9 +29,10 @@ def build_prompt(user_prompt):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate and execute shell commands based on natural language prompts.")
-    parser.add_argument('-a', '--api-base', default="http://localhost:11434", help="API base URL (default: http://localhost:11434)")
+    parser.add_argument('-a', '--api-base', default="http://localhost:11434/v1", help="API base URL (default: http://localhost:11434/v1)")
     parser.add_argument('-m', '--model', default="codegemma:instruct", help="Model to use (default: codegemma:instruct)")
     parser.add_argument('-v', '--verbose', action='store_true', help="Enable verbose logging")
+    parser.add_argument('-k', '--api-key', help="API key for endpoints that require authentication")
     parser.add_argument('prompt', nargs='+', help="The prompt for generating the command")
 
     args = parser.parse_args()
@@ -43,6 +44,7 @@ def main():
     config = {
         "api_base": args.api_base,
         "model": args.model,
+        "api_key": args.api_key,
     }
 
     client = requests.Session()
@@ -50,11 +52,14 @@ def main():
 
     while True:
         with Halo(text='Generating your command...', spinner='dots') as spinner:
-            api_addr = f"{config['api_base']}/api/generate"
+            api_addr = f"{config['api_base']}/chat/completions"
+            headers = {}
+            if config['api_key']:
+                headers['Authorization'] = f"Bearer {config['api_key']}"
             response = client.post(api_addr, json={
                 "model": config["model"],
-                "prompt": build_prompt(user_prompt),
-                "system": """You are a helpful assistant specialized in generating one-liner shell commands based on user prompts.
+                "messages": [
+                    {"role": "system", "content": """You are a helpful assistant specialized in generating one-liner shell commands based on user prompts.
                             Respond with only the command, nothing else.
                             Your output must be in plain text.
 
@@ -68,23 +73,20 @@ def main():
                             Your output: nmap localhost
                             --- End of example 2 ---
                             
-                            Do not hallucinate.""",
+                            Do not hallucinate."""},
+                    {"role": "user", "content": build_prompt(user_prompt)}
+                ],
                 "stream": False
-            })
+            }, headers=headers)
 
         try:
-            error_data = response.json()
-            if isinstance(error_data, str):
-                error_message = error_data
-            else:
-                error_message = error_data.get('error', {}).get('message', 'Unknown error')
-            
+            response_json = response.json()
             logging.debug(f"Response status code: {response.status_code}")
             logging.debug(f"Response content: {response.text}")
 
             # Check for client and server errors using direct comparison
-            if 400 <= response.status_code < 500 or 500 <= response.status_code < 600:
-                error_message = response.text  # Get raw response text
+            if 400 <= response.status_code < 600:
+                error_message = response.text
                 try:
                     error_data = json.loads(response.text)
                     error_message = error_data.get('error', {}).get('message', 'Unknown error')
@@ -95,7 +97,7 @@ def main():
                 print(f"{Fore.RED}API error: {error_message}")
                 sys.exit(1)
 
-            code = response.json()["response"].strip()
+            code = response_json["choices"][0]["message"]["content"].strip()
 
             print(f"{Fore.GREEN}✔ Got some code!")
             print(highlight(code, BashLexer(), TerminalFormatter()))
